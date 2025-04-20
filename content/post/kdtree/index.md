@@ -3,6 +3,8 @@ title: "K-D Tree"
 description: k-D Tree(KDT , k-Dimension Tree) 是一种可以 高效处理 k 维空间信息 的数据结构。
 date: 2025-04-20T12:09:42Z
 math: true
+categories:
+    - 数据结构与算法
 ---
 
 k-D Tree(KDT , k-Dimension Tree) 是一种可以 高效处理 k 维空间信息 的数据结构。
