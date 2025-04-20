@@ -4,6 +4,7 @@ date: 2025-04-20T12:50:37Z
 categories:
     - 分布式系统
 image: cap.png
+description: 一致性（Consistency）、可用性（Availability）和分区容错性（Partition tolerance）
 ---
 
 > 本文非本人撰写，全文来源于：https://zhuanlan.zhihu.com/p/338835258

@@ -1,10 +1,10 @@
 ---
 title: "友链"
 links:
-  - title: GitHub
-    description: GitHub is the world's largest software development platform.
-    website: https://github.com
-    image: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+  - title: Tabler Icons
+    description: Free and open source icons designed to make your website or app attractive, visually consistent and simply beautiful.
+    website: https://tabler.io/icons
+    image: brand-tabler.svg
   - title: 南京大学
     description: 南京大学官方网站
     website: https://www.nju.edu.cn/
