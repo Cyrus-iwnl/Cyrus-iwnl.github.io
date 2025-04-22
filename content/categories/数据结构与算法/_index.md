@@ -6,5 +6,5 @@ image: algorithm.jpg
 # Badge style
 style:
     background: "#4cae4f"
-    color: "#ffffff"
+    color: "#fff"
 ---

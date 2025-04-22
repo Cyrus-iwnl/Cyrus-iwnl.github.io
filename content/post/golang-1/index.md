@@ -1,5 +1,5 @@
 ---
-title: "Golang学习日记Day1"
+title: "Golang 学习日记 Day1"
 description: 本文记录了我今天学习的内容，主要包括包、变量、函数、控制结构、指针、数组、切片、map等基本语法知识。
 date: 2025-04-22T16:43:16Z
 image: go.jpg

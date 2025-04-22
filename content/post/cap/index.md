@@ -1,5 +1,5 @@
 ---
-title: "CAP理论"
+title: "CAP 理论"
 date: 2025-04-20T12:50:37Z
 categories:
     - 分布式系统

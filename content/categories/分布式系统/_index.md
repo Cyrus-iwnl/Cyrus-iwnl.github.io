@@ -4,5 +4,5 @@ description: 分布式系统是由一组通过网络进行通信、为了完成�
 image: dist.jpg
 style:
     background: "#f1b83b"
-    color: "#ffffff"
+    color: "#fff"
 ---
