@@ -1,0 +1,711 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>StarRocks on Cyrus' Blog</title><link>https://Cyrus-iwnl.github.io/categories/starrocks/</link><description>Recent content in StarRocks on Cyrus' Blog</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Thu, 05 Jun 2025 00:00:00 +0000</lastBuildDate><atom:link href="https://Cyrus-iwnl.github.io/categories/starrocks/index.xml" rel="self" type="application/rss+xml"/><item><title>StarRocks 学习笔记 Day4</title><link>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day4/</link><pubDate>Thu, 05 Jun 2025 00:00:00 +0000</pubDate><guid>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day4/</guid><description>&lt;img src="https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day4/sr.png" alt="Featured image of post StarRocks 学习笔记 Day4" />&lt;h2 id="01-集群部署">&lt;a href="#01-%e9%9b%86%e7%be%a4%e9%83%a8%e7%bd%b2" class="header-anchor">&lt;/a>01. 集群部署
+&lt;/h2>&lt;p>StarRocks 集群的规范化部署遵循六个主要步骤 。&lt;/p>
+&lt;h3 id="-检查部署要求">&lt;a href="#-%e6%a3%80%e6%9f%a5%e9%83%a8%e7%bd%b2%e8%a6%81%e6%b1%82" class="header-anchor">&lt;/a>① 检查部署要求
+&lt;/h3>&lt;p>&lt;strong>硬件要求&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>CPU&lt;/strong>: FE 推荐 8 核以上，BE 推荐 16 核以上。x86 架构下 BE 必须支持 AVX2 指令集才能启动 。&lt;/li>
+&lt;li>&lt;strong>内存&lt;/strong>: 生产环境 FE 推荐 16GB+，BE 推荐 64GB+ 。&lt;/li>
+&lt;li>&lt;strong>存储&lt;/strong>: 推荐使用 SSD 。FE 预留 100GB 以上独立存储 。BE 磁盘容量根据数据量（默认三副本和 LZ4 压缩）、节点数和 20% 以上的冗余空间来评估 。&lt;/li>
+&lt;li>&lt;strong>网络&lt;/strong>: 强烈推荐万兆（10GE）或以上网络 。&lt;/li>
+&lt;/ul>
+&lt;p>&lt;strong>软件与系统要求&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>操作系统&lt;/strong>: 推荐 CentOS 7.9 或 Ubuntu 22.04 。&lt;/li>
+&lt;li>&lt;strong>软件环境&lt;/strong>:
+&lt;ul>
+&lt;li>所有节点需安装 JDK 。StarRocks 2.5 及以上版本推荐 JDK 11（3.3 版本起不再支持 JDK 8）。&lt;/li>
+&lt;li>推荐安装 MySQL 客户端便于运维 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="-规划集群架构">&lt;a href="#-%e8%a7%84%e5%88%92%e9%9b%86%e7%be%a4%e6%9e%b6%e6%9e%84" class="header-anchor">&lt;/a>② 规划集群架构
+&lt;/h3>&lt;ul>
+&lt;li>&lt;strong>FE (Frontend)&lt;/strong>: 生产环境推荐部署 3 个 Follower 角色的 FE 节点以实现高可用 。不允许在同一 IP 的机器上部署多个 FE 实例 。&lt;/li>
+&lt;li>&lt;strong>BE (Backend)&lt;/strong>: 生产环境推荐至少部署 3 个 BE 节点以实现三副本高可用 。查询性能与 BE 数量正相关，推荐服务器同构 。&lt;/li>
+&lt;li>&lt;strong>CN (Compute Node)&lt;/strong>: 存算一体架构下的可选组件，用于扩展计算能力 。&lt;/li>
+&lt;li>&lt;strong>Broker&lt;/strong>: 可选组件，按需部署 。&lt;/li>
+&lt;/ul>
+&lt;h3 id="-配置系统环境">&lt;a href="#-%e9%85%8d%e7%bd%ae%e7%b3%bb%e7%bb%9f%e7%8e%af%e5%a2%83" class="header-anchor">&lt;/a>③ 配置系统环境
+&lt;/h3>&lt;p>部署前需对所有服务器进行系统参数配置，以保证集群稳定性和性能 。带 &lt;code>*&lt;/code> 的为必调项 。&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th>配置项&lt;/th>
+&lt;th>描述与要求&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td>&lt;strong>CPU AVX2 指令集检查&lt;/strong>*&lt;/td>
+&lt;td>x86 架构下 BE 依赖 AVX2 。检查命令：`cat /proc/cpuinfo&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>操作系统检查&lt;/strong>*&lt;/td>
+&lt;td>内核版本不低于 3.10，glibc 版本不低于 2.17 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>端口冲突检查&lt;/strong>*&lt;/td>
+&lt;td>确认 FE/BE/CN 的默认端口未被占用 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>JDK 配置&lt;/strong>*&lt;/td>
+&lt;td>推荐 JDK 11，并配置好 &lt;code>JAVA_HOME&lt;/code> 环境变量 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>Overcommit 参数设置&lt;/strong>*&lt;/td>
+&lt;td>要求 &lt;code>overcommit_memory=1&lt;/code> 。修改命令：&lt;code>echo 1 &amp;gt; /proc/sys/vm/overcommit_memory&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>mmap 参数设置&lt;/strong>*&lt;/td>
+&lt;td>推荐调整到 200万以上 。修改命令：&lt;code>echo 2000000 &amp;gt; /proc/sys/vm/max_map_count&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>透明大页参数设置&lt;/strong>*&lt;/td>
+&lt;td>推荐禁用 。修改命令：&lt;code>echo never &amp;gt; /sys/kernel/mm/transparent_hugepage/enabled&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>Swap 分区设置&lt;/strong>*&lt;/td>
+&lt;td>要求禁用交换分区，&lt;code>swapoff -a&lt;/code> 。同时设置 &lt;code>swappiness=0&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>磁盘调度算法&lt;/strong>*&lt;/td>
+&lt;td>HDD 建议使用 &lt;code>deadline&lt;/code>，SSD 建议使用 &lt;code>noop&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>SELinux 设置&lt;/strong>*&lt;/td>
+&lt;td>推荐禁用 。修改命令：&lt;code>setenforce 0&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>防火墙设置&lt;/strong>*&lt;/td>
+&lt;td>内网环境推荐禁用防火墙 &lt;code>systemctl stop firewalld&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>ulimit 设置&lt;/strong>*&lt;/td>
+&lt;td>最大句柄数(nofile)和用户进程数(nproc)要求大于 65535 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>网络参数设置&lt;/strong>*&lt;/td>
+&lt;td>推荐调整 &lt;code>tcp_abort_on_overflow=1&lt;/code> 和 &lt;code>somaxconn=1024&lt;/code> 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>时钟同步&lt;/strong>*&lt;/td>
+&lt;td>各 FE 间时钟差大于 5 秒服务将无法启动 。推荐使用 ntp 服务进行同步 。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;strong>文件系统设置&lt;/strong>*&lt;/td>
+&lt;td>推荐使用 ext4 或 xfs 文件系统 。&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="-准备部署文件">&lt;a href="#-%e5%87%86%e5%a4%87%e9%83%a8%e7%bd%b2%e6%96%87%e4%bb%b6" class="header-anchor">&lt;/a>④ 准备部署文件
+&lt;/h3>&lt;p>可从 StarRocks 社区官网或镜舟科技官网获取二进制安装包 。版本号格式为 &lt;code>Major.Minor.Patch&lt;/code> 。&lt;/p>
+&lt;h3 id="-部署-starrocks">&lt;a href="#-%e9%83%a8%e7%bd%b2-starrocks" class="header-anchor">&lt;/a>⑤ 部署 StarRocks
+&lt;/h3>&lt;p>以部署 3 个 FE 和 3 个 BE 节点为例 ：&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>前置准备&lt;/strong>: 创建用户、授权目录、配置 SSH 免密、解压并分发安装包 。&lt;/li>
+&lt;li>&lt;strong>FE 部署&lt;/strong>:
+&lt;ul>
+&lt;li>&lt;strong>创建元数据目录&lt;/strong>: &lt;code>mkdir meta&lt;/code> 。&lt;/li>
+&lt;li>&lt;strong>修改配置 &lt;code>fe.conf&lt;/code>&lt;/strong>:
+&lt;ul>
+&lt;li>配置 JVM 堆内存（生产推荐 20G+）。&lt;/li>
+&lt;li>配置元数据目录 &lt;code>meta_dir&lt;/code> 。&lt;/li>
+&lt;li>通过 &lt;code>priority_networks&lt;/code> 绑定服务 IP 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;strong>启动与添加节点&lt;/strong>:
+&lt;ul>
+&lt;li>在第一个节点上执行 &lt;code>./start_fe.sh --daemon&lt;/code> 启动服务 。&lt;/li>
+&lt;li>使用 MySQL 客户端连接该 FE，添加其他 FE 节点：&lt;code>ALTER SYSTEM ADD FOLLOWER 'ip:9010';&lt;/code> 。&lt;/li>
+&lt;li>在其他节点上以 &lt;code>--helper&lt;/code> 方式启动 FE：&lt;code>./start_fe.sh --helper &amp;lt;node1_ip&amp;gt;:9010 --daemon&lt;/code> 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;strong>BE 部署&lt;/strong>:
+&lt;ul>
+&lt;li>&lt;strong>创建数据目录&lt;/strong>: &lt;code>mkdir storage&lt;/code> 。&lt;/li>
+&lt;li>&lt;strong>修改配置 &lt;code>be.conf&lt;/code>&lt;/strong>:
+&lt;ul>
+&lt;li>配置数据存储路径 &lt;code>storage_root_path&lt;/code>，支持多目录配置 。&lt;/li>
+&lt;li>通过 &lt;code>priority_networks&lt;/code> 绑定服务 IP 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;strong>添加与启动节点&lt;/strong>:
+&lt;ul>
+&lt;li>使用 MySQL 客户端连接 FE，添加 BE 节点：&lt;code>ALTER SYSTEM ADD BACKEND 'ip:9050';&lt;/code> 。&lt;/li>
+&lt;li>在所有 BE 节点上执行 &lt;code>./start_be.sh --daemon&lt;/code> 启动服务 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;strong>服务启停与密码修改&lt;/strong>:
+&lt;ul>
+&lt;li>启停脚本位于各组件的 &lt;code>bin&lt;/code> 目录下 (&lt;code>start_xx.sh&lt;/code>, &lt;code>stop_xx.sh&lt;/code>) 。&lt;/li>
+&lt;li>初始 root 用户密码为空，可通过 &lt;code>SET PASSWORD = PASSWORD('new_password');&lt;/code> 修改 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="-部署后参数调整">&lt;a href="#-%e9%83%a8%e7%bd%b2%e5%90%8e%e5%8f%82%e6%95%b0%e8%b0%83%e6%95%b4" class="header-anchor">&lt;/a>⑥ 部署后参数调整
+&lt;/h3>&lt;ul>
+&lt;li>&lt;strong>&lt;code>fe.conf&lt;/code> 中 Xmx 堆内存&lt;/strong>: 生产环境建议调整至 20GB 以上 。&lt;/li>
+&lt;li>&lt;strong>用户连接数&lt;/strong>: 默认 100，可按需调整 &lt;code>max_user_connections&lt;/code> 。&lt;/li>
+&lt;li>&lt;strong>BE 内存配置&lt;/strong>:
+&lt;ul>
+&lt;li>通过 &lt;code>mem_limit&lt;/code> 限制 BE 内存使用，默认为服务器内存的 90% 。&lt;/li>
+&lt;li>若使用 UDF 等功能，需配置 BE 的 JVM 内存上限 &lt;code>JAVA_OPTS=&amp;quot;-Xmx4096m ...&amp;quot;&lt;/code> 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h2 id="02-升级与回滚">&lt;a href="#02-%e5%8d%87%e7%ba%a7%e4%b8%8e%e5%9b%9e%e6%bb%9a" class="header-anchor">&lt;/a>02. 升级与回滚
+&lt;/h2>&lt;h3 id="集群升级">&lt;a href="#%e9%9b%86%e7%be%a4%e5%8d%87%e7%ba%a7" class="header-anchor">&lt;/a>集群升级
+&lt;/h3>&lt;ul>
+&lt;li>&lt;strong>升级分类&lt;/strong>: 分为小版本升级（如 3.1.10 -&amp;gt; 3.1.11）和大版本升级（如 3.0 -&amp;gt; 3.1）[cite: 95, 96] 。大版本升级不建议跨版本进行 。&lt;/li>
+&lt;li>&lt;strong>升级顺序&lt;/strong>: 先升级 BE/CN，再升级 FE 。FE 内部顺序为 Observer -&amp;gt; Follower -&amp;gt; Leader 。&lt;/li>
+&lt;li>&lt;strong>升级操作&lt;/strong>: 本质是替换 &lt;code>bin&lt;/code> 和 &lt;code>lib&lt;/code> 等程序文件目录 。为减少停机时间，可先将新版本文件放入部署目录，停止服务后，通过重命名目录的方式快速切换，然后启动新服务 。&lt;/li>
+&lt;/ul>
+&lt;h3 id="集群降级回滚">&lt;a href="#%e9%9b%86%e7%be%a4%e9%99%8d%e7%ba%a7%e5%9b%9e%e6%bb%9a" class="header-anchor">&lt;/a>集群降级/回滚
+&lt;/h3>&lt;ul>
+&lt;li>&lt;strong>降级分类&lt;/strong>: 同样分为小版本和大版本降级 [cite: 112, 113] 。大版本降级不建议跨版本，且只推荐降级到目标大版本的最新小版本 。&lt;/li>
+&lt;li>&lt;strong>降级顺序&lt;/strong>: 与升级相反，先降级 FE，再降级 BE/CN 。FE 内部顺序为 Observer -&amp;gt; Follower -&amp;gt; Leader 。&lt;/li>
+&lt;li>&lt;strong>降级操作&lt;/strong>: 与升级操作类似，通过替换程序文件目录，将版本回滚至升级前的备份版本 。&lt;/li>
+&lt;/ul>
+&lt;h2 id="03-集群扩缩容">&lt;a href="#03-%e9%9b%86%e7%be%a4%e6%89%a9%e7%bc%a9%e5%ae%b9" class="header-anchor">&lt;/a>03. 集群扩缩容
+&lt;/h2>&lt;h3 id="集群扩容">&lt;a href="#%e9%9b%86%e7%be%a4%e6%89%a9%e5%ae%b9" class="header-anchor">&lt;/a>集群扩容
+&lt;/h3>&lt;ul>
+&lt;li>&lt;strong>FE 扩容&lt;/strong>: 当 FE 负载高时，可扩容 Observer 节点 。新节点 &lt;code>http_port&lt;/code> 必须与现有集群一致 。首次启动需以 &lt;code>--helper&lt;/code> 方式加入集群 。&lt;/li>
+&lt;li>&lt;strong>BE 扩容&lt;/strong>: 当存储或计算资源出现瓶颈时，可扩容 BE 。新节点推荐与现有 BE 同构 。扩容后数据会自动均衡 。&lt;/li>
+&lt;/ul>
+&lt;h3 id="集群缩容">&lt;a href="#%e9%9b%86%e7%be%a4%e7%bc%a9%e5%ae%b9" class="header-anchor">&lt;/a>集群缩容
+&lt;/h3>&lt;ul>
+&lt;li>&lt;strong>FE 缩容&lt;/strong>: 使用 &lt;code>ALTER SYSTEM DROP OBSERVER/FOLLOWER 'ip:9010';&lt;/code> 命令 。不允许直接缩容 Leader 节点 。&lt;/li>
+&lt;li>&lt;strong>BE 缩容&lt;/strong>:
+&lt;ul>
+&lt;li>&lt;code>DECOMMISSION&lt;/code>（推荐）: &lt;code>ALTER SYSTEM DECOMMISSION BACKEND 'ip:9050';&lt;/code> 。此方式会先将数据安全迁移至其他 BE 节点，再下线该节点 。&lt;/li>
+&lt;li>&lt;code>DROP&lt;/code>: &lt;code>ALTER SYSTEM DROP BACKEND 'ip:9050';&lt;/code>。此方式会立刻删除 BE，可能导致数据丢失 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h2 id="04-参数调整">&lt;a href="#04-%e5%8f%82%e6%95%b0%e8%b0%83%e6%95%b4" class="header-anchor">&lt;/a>04. 参数调整
+&lt;/h2>&lt;h3 id="参数分类">&lt;a href="#%e5%8f%82%e6%95%b0%e5%88%86%e7%b1%bb" class="header-anchor">&lt;/a>参数分类
+&lt;/h3>&lt;ol>
+&lt;li>
+&lt;p>&lt;strong>系统变量 (System Variables)&lt;/strong>:&lt;/p>
+&lt;ul>
+&lt;li>通过 &lt;code>SHOW VARIABLES;&lt;/code> 查看 。&lt;/li>
+&lt;li>支持 SQL 级 (&lt;code>/*+ SET_VAR(...) */&lt;/code>)、会话级 (&lt;code>SET SESSION ...&lt;/code>) 和全局级 (&lt;code>SET GLOBAL ...&lt;/code>) 三种生效范围 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>FE 参数&lt;/strong>:&lt;/p>
+&lt;ul>
+&lt;li>分为动态参数和静态参数 。&lt;/li>
+&lt;li>&lt;strong>动态参数&lt;/strong>: 支持在线修改 (&lt;code>ADMIN SET FRONTEND CONFIG ('key'='value');&lt;/code>)，立即生效但重启后失效 。&lt;/li>
+&lt;li>&lt;strong>静态参数&lt;/strong>: 只能通过修改 &lt;code>fe.conf&lt;/code> 文件并重启 FE 生效 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>BE 参数&lt;/strong>:&lt;/p>
+&lt;ul>
+&lt;li>同样分为动态和静态参数 。&lt;/li>
+&lt;li>&lt;strong>动态参数&lt;/strong>: 支持通过 HTTP 请求临时修改 (&lt;code>curl -XPOST http://be_ip:be_http_port/api/update_config?key=value&lt;/code>)，立即生效但重启后失效 。&lt;/li>
+&lt;li>&lt;strong>静态参数&lt;/strong>: 只能通过修改 &lt;code>be.conf&lt;/code> 文件并重启 BE 生效 。# StarRocks 基础运维学习笔记&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol></description></item><item><title>StarRocks 学习笔记 Day3</title><link>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day3/</link><pubDate>Mon, 02 Jun 2025 00:00:00 +0000</pubDate><guid>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day3/</guid><description>&lt;img src="https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day3/sr.png" alt="Featured image of post StarRocks 学习笔记 Day3" />&lt;h2 id="1-存算一体架构-shared-nothing">&lt;a href="#1-%e5%ad%98%e7%ae%97%e4%b8%80%e4%bd%93%e6%9e%b6%e6%9e%84-shared-nothing" class="header-anchor">&lt;/a>1. 存算一体架构 (Shared-nothing)
+&lt;/h2>&lt;p>存算一体架构是 StarRocks 的经典架构，其特点是极简、无外部依赖、服务高可用且易于扩展 。整个系统主要由 FE 和 BE 两类进程组成 。&lt;/p>
+&lt;h3 id="11-fe-frontend">&lt;a href="#11-fe-frontend" class="header-anchor">&lt;/a>1.1 FE (Frontend)
+&lt;/h3>&lt;p>FE 是 StarRocks 的前端节点，使用 &lt;strong>Java&lt;/strong> 语言开发 。它负责元数据管理、客户端请求接收与返回、查询规划与调度等 。&lt;/p>
+&lt;h4 id="fe-角色">&lt;a href="#fe-%e8%a7%92%e8%89%b2" class="header-anchor">&lt;/a>FE 角色
+&lt;/h4>&lt;p>一个 StarRocks 集群可以有多个 FE 节点，以保证高可用。FE 节点有三种角色：&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Leader&lt;/strong>: 通过选举产生，是唯一可以写入元数据的节点 。&lt;/li>
+&lt;li>&lt;strong>Follower&lt;/strong>: 负责元数据读取，并参与 Leader 选举 。当半数以上 Follower 存活时，才能进行有效的 Leader 选举 。&lt;/li>
+&lt;li>&lt;strong>Observer&lt;/strong>: 也负责元数据读取，用于扩展集群的读取能力，但不参与选举 。&lt;/li>
+&lt;/ul>
+&lt;h4 id="fe-元数据管理">&lt;a href="#fe-%e5%85%83%e6%95%b0%e6%8d%ae%e7%ae%a1%e7%90%86" class="header-anchor">&lt;/a>FE 元数据管理
+&lt;/h4>&lt;ul>
+&lt;li>&lt;strong>元数据内容&lt;/strong>: 每个 FE 都存有完整的元数据副本 ，主要包含四类信息：
+&lt;ol>
+&lt;li>数据信息（库、表结构、分片等）。&lt;/li>
+&lt;li>作业信息（导入、Clone、Schema Change 等）。&lt;/li>
+&lt;li>用户及权限信息 。&lt;/li>
+&lt;li>集群及节点信息 。&lt;/li>
+&lt;/ol>
+&lt;/li>
+&lt;li>&lt;strong>持久化&lt;/strong>: 使用 Oracle Berkeley DB Java Edition (BDBJE) 来持久化元数据操作日志，并通过日志同步实现 FE 节点间的数据一致性和高可用 。元数据会定期生成镜像文件 (image) 以加快启动时加载速度 。&lt;/li>
+&lt;/ul>
+&lt;h4 id="fe-查询规划与调度">&lt;a href="#fe-%e6%9f%a5%e8%af%a2%e8%a7%84%e5%88%92%e4%b8%8e%e8%b0%83%e5%ba%a6" class="header-anchor">&lt;/a>FE 查询规划与调度
+&lt;/h4>&lt;p>FE 负责将接收到的 SQL 查询转换成物理执行计划 。这个过程包括：&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>解析 (Parser)&lt;/strong>: 将 SQL 文本转换为抽象语法树 (AST) 。&lt;/li>
+&lt;li>&lt;strong>分析 (Analyzer)&lt;/strong>: 结合元数据对 AST 进行分析 。&lt;/li>
+&lt;li>&lt;strong>重写与优化 (Rewriter &amp;amp; Optimizer)&lt;/strong>: 基于规则和成本估算对逻辑计划进行优化，生成最优的分布式物理执行计划 。&lt;/li>
+&lt;li>&lt;strong>调度&lt;/strong>: 将物理计划下发给 BE 节点执行 。&lt;/li>
+&lt;/ol>
+&lt;h3 id="12-be-backend">&lt;a href="#12-be-backend" class="header-anchor">&lt;/a>1.2 BE (Backend)
+&lt;/h3>&lt;p>BE 是 StarRocks 的后端节点，使用 &lt;strong>C++&lt;/strong> 语言开发 。它负责执行 FE 下发的计划，并管理本地数据的存储 。&lt;/p>
+&lt;h4 id="存储引擎-storage-engine">&lt;a href="#%e5%ad%98%e5%82%a8%e5%bc%95%e6%93%8e-storage-engine" class="header-anchor">&lt;/a>存储引擎 (Storage Engine)
+&lt;/h4>&lt;ul>
+&lt;li>&lt;strong>数据分布&lt;/strong>: 表中的数据通过两层结构进行分布：
+&lt;ol>
+&lt;li>&lt;strong>分区 (Partition)&lt;/strong>: 按范围 (Range) 对数据进行第一层切分 。&lt;/li>
+&lt;li>&lt;strong>分桶 (Bucket)&lt;/strong>: 在分区内，按哈希 (Hash) 将数据切分为更小的逻辑单元，即 &lt;strong>Tablet&lt;/strong> 。Tablet 是数据分片和副本管理的基本单位 。&lt;/li>
+&lt;/ol>
+&lt;/li>
+&lt;li>&lt;strong>存储格式&lt;/strong>:
+&lt;ul>
+&lt;li>数据以 &lt;strong>Tablet&lt;/strong> 的形式物理存储 。&lt;/li>
+&lt;li>采用列式存储，并使用 LZ4 等算法进行压缩 。&lt;/li>
+&lt;li>为数据创建多种索引（如 Short Key Index, Zone Map Index）以加速查询 。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h4 id="执行引擎-execution-engine">&lt;a href="#%e6%89%a7%e8%a1%8c%e5%bc%95%e6%93%8e-execution-engine" class="header-anchor">&lt;/a>执行引擎 (Execution Engine)
+&lt;/h4>&lt;ul>
+&lt;li>BE 的执行引擎采用 &lt;strong>MPP (Massively Parallel Processing)&lt;/strong> 多机并行计算模型 。&lt;/li>
+&lt;li>它接收 FE 下发的执行计划片段 (Fragment)，在多个 BE 节点上并行执行 。&lt;/li>
+&lt;li>通过 Shuffle 算子实现数据在节点间的交换，以完成分布式的 Join 和聚合计算 。&lt;/li>
+&lt;/ul>
+&lt;h3 id="13-broker-组件-可选">&lt;a href="#13-broker-%e7%bb%84%e4%bb%b6-%e5%8f%af%e9%80%89" class="header-anchor">&lt;/a>1.3 Broker 组件 (可选)
+&lt;/h3>&lt;p>Broker 是一个独立的、无状态的 Java 进程，用于封装文件系统接口，帮助 StarRocks 读写 HDFS、S3、OSS 等远端存储系统上的文件 。&lt;/p>
+&lt;ul>
+&lt;li>从 2.5 版本开始，BE 节点也可以直接访问外部存储，但在多 HDFS 集群或多 Kerberos 用户的复杂场景下，使用 Broker 仍然更加方便 。&lt;/li>
+&lt;/ul>
+&lt;hr>
+&lt;h2 id="2-存算分离架构-shared-data">&lt;a href="#2-%e5%ad%98%e7%ae%97%e5%88%86%e7%a6%bb%e6%9e%b6%e6%9e%84-shared-data" class="header-anchor">&lt;/a>2. 存算分离架构 (Shared-data)
+&lt;/h2>&lt;p>为了实现计算和存储资源的独立弹性伸缩，降低成本并提高资源利用率，StarRocks 推出了存算分离架构 。该架构将存储和计算解耦，系统由 FE、CN 和对象存储三部分组成 。&lt;/p>
+&lt;h3 id="21-fe-frontend">&lt;a href="#21-fe-frontend" class="header-anchor">&lt;/a>2.1 FE (Frontend)
+&lt;/h3>&lt;ul>
+&lt;li>在存算分离架构中，FE 的功能与存算一体架构类似，仍然负责元数据管理和查询规划 。&lt;/li>
+&lt;li>元数据目前仍存储在 FE 的本地磁盘上 。&lt;/li>
+&lt;li>内部集成了 &lt;strong>StarManager&lt;/strong> 模块，用于计算和存储资源的统一管理与调度，但对用户透明 。&lt;/li>
+&lt;/ul>
+&lt;h3 id="22-cn-compute-node">&lt;a href="#22-cn-compute-node" class="header-anchor">&lt;/a>2.2 CN (Compute Node)
+&lt;/h3>&lt;ul>
+&lt;li>CN 是由 BE 演进而来的&lt;strong>无状态&lt;/strong>计算节点 。&lt;/li>
+&lt;li>它负责执行 FE 下发的查询计划，但不持久化存储数据，所有数据均持久化至后端存储 。&lt;/li>
+&lt;li>为了提升性能，CN 会利用本地磁盘&lt;strong>缓存热点数据&lt;/strong> 。查询时会优先读取本地缓存，若未命中则从远端对象存储拉取数据并存入缓存 。&lt;/li>
+&lt;li>由于 CN 无状态，其扩缩容可以在秒级完成，无需数据搬迁 。&lt;/li>
+&lt;/ul>
+&lt;h3 id="23-对象存储-object-storage">&lt;a href="#23-%e5%af%b9%e8%b1%a1%e5%ad%98%e5%82%a8-object-storage" class="header-anchor">&lt;/a>2.3 对象存储 (Object Storage)
+&lt;/h3>&lt;ul>
+&lt;li>所有数据都以 StarRocks 自有的文件格式持久化存储在对象存储上，如 AWS S3, HDFS, Aliyun OSS 等 。&lt;/li>
+&lt;li>这种模式可以充分利用 Primary Key 更新、Colocate Group 等高级特性 。&lt;/li>
+&lt;li>在对象存储中，数据通常被组织在 &lt;code>data&lt;/code>、&lt;code>meta&lt;/code>、&lt;code>log&lt;/code> 等目录下 。&lt;/li>
+&lt;/ul>
+&lt;hr>
+&lt;h2 id="3-架构选择">&lt;a href="#3-%e6%9e%b6%e6%9e%84%e9%80%89%e6%8b%a9" class="header-anchor">&lt;/a>3. 架构选择
+&lt;/h2>&lt;p>存算一体和存算分离架构功能一致、性能相近，旨在互补，满足不同业务场景的需求 。&lt;/p>
+&lt;h3 id="推荐使用存算分离的场景">&lt;a href="#%e6%8e%a8%e8%8d%90%e4%bd%bf%e7%94%a8%e5%ad%98%e7%ae%97%e5%88%86%e7%a6%bb%e7%9a%84%e5%9c%ba%e6%99%af" class="header-anchor">&lt;/a>推荐使用&lt;strong>存算分离&lt;/strong>的场景
+&lt;/h3>&lt;ul>
+&lt;li>存储成本高，有大量冷数据 。&lt;/li>
+&lt;li>集群资源利用率波动大，有明显的波峰波谷 。&lt;/li>
+&lt;li>多业务共享集群，资源争抢严重 。&lt;/li>
+&lt;li>对服务高可用和故障转移有强烈需求 。&lt;/li>
+&lt;li>基于公有云或 K8s 部署，希望实现资源的按需弹性伸缩 。&lt;/li>
+&lt;li>运维多套集群压力大，希望统一存储，简化运维 。&lt;/li>
+&lt;/ul>
+&lt;h3 id="存算分离目前尚不适用的场景">&lt;a href="#%e5%ad%98%e7%ae%97%e5%88%86%e7%a6%bb%e7%9b%ae%e5%89%8d%e5%b0%9a%e4%b8%8d%e9%80%82%e7%94%a8%e7%9a%84%e5%9c%ba%e6%99%af" class="header-anchor">&lt;/a>&lt;strong>存算分离&lt;/strong>目前尚不适用的场景
+&lt;/h3>&lt;ul>
+&lt;li>环境中不具备对象存储或 HDFS 。&lt;/li>
+&lt;li>写入频率非常高（如间隔小于 10s）且并发量大 。&lt;/li>
+&lt;li>对查询性能有极其严格的要求，无法接受任何冷查询场景下的性能下降 。&lt;/li>
+&lt;/ul></description></item><item><title>StarRocks 学习笔记 Day2</title><link>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day2/</link><pubDate>Sat, 31 May 2025 00:00:00 +0000</pubDate><guid>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day2/</guid><description>&lt;img src="https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day2/sr.png" alt="Featured image of post StarRocks 学习笔记 Day2" />&lt;h2 id="1-极速特性">&lt;a href="#1-%e6%9e%81%e9%80%9f%e7%89%b9%e6%80%a7" class="header-anchor">&lt;/a>1. 极速特性
+&lt;/h2>&lt;p>StarRocks 通过一套精密的系统设计，实现了从查询优化到执行引擎的全方位加速，确保了其极致的查询性能。&lt;/p>
+&lt;h3 id="11-查询处理四大核心技术">&lt;a href="#11-%e6%9f%a5%e8%af%a2%e5%a4%84%e7%90%86%e5%9b%9b%e5%a4%a7%e6%a0%b8%e5%bf%83%e6%8a%80%e6%9c%af" class="header-anchor">&lt;/a>1.1 查询处理四大核心技术
+&lt;/h3>&lt;p>StarRocks 之所以能够极速完成 SQL 查询，主要得益于以下四个关键技术：&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>CBO 优化器: 通过强大的基于成本的优化器 (Cost-Based Optimizer)，生成最优的分布式物理执行计划。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>MPP 分布式执行框架: 采用大规模并行处理 (Massively Parallel Processing) 架构，充分利用多机资源，使查询性能随机器数量近似线性扩展。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Pipeline 并行执行框架: 在单节点内部，通过 Pipeline 框架充分利用多核资源，使查询性能随 CPU 核数近似线性提升。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>全面向量化执行引擎: 充分发掘 CPU 单核的计算潜力，将单核执行性能推向极致。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="12-mpp-分布式执行框架">&lt;a href="#12-mpp-%e5%88%86%e5%b8%83%e5%bc%8f%e6%89%a7%e8%a1%8c%e6%a1%86%e6%9e%b6" class="header-anchor">&lt;/a>1.2 MPP 分布式执行框架
+&lt;/h3>&lt;p>MPP 架构是 StarRocks 高性能的关键。它将一个查询任务分解为多个逻辑单元（Fragment），并在不同计算节点上并行执行。&lt;/p>
+&lt;p>执行模式对比:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>Scatter/Gather: 计算任务汇聚于单点，处理大表 Join 和高基数聚合时存在瓶颈。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>MapReduce: 任务间需要等待，且中间结果需要落盘，产生磁盘 I/O 开销。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>MPP: 采用流水线执行，数据在内存中直接传输，无需等待和磁盘 I/O，效率极高。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;p>执行流程 (以 &lt;code>GROUP BY&lt;/code> 为例):&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>本地聚合 (Local Agg): 各个节点并行扫描本地数据并进行预聚合。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>数据混洗 (Shuffle): 将预聚合后的数据按照 &lt;code>GROUP BY&lt;/code> 的 key（例如 &lt;code>id&lt;/code>）进行 Hash，发送到对应的目标节点。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>最终聚合 (Final Agg): 目标节点接收来自其他节点的数据，并完成最终的聚合计算，然后返回结果。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="13-全面向量化执行引擎">&lt;a href="#13-%e5%85%a8%e9%9d%a2%e5%90%91%e9%87%8f%e5%8c%96%e6%89%a7%e8%a1%8c%e5%bc%95%e6%93%8e" class="header-anchor">&lt;/a>1.3 全面向量化执行引擎
+&lt;/h3>&lt;p>向量化引擎是发挥 CPU 单核性能的利器。&lt;/p>
+&lt;p>核心思想: 数据按列组织和处理，在一个 &lt;code>chunk&lt;/code>（一批数据）上完成一个操作，然后再执行下一个操作。&lt;/p>
+&lt;p>优势:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>采用高效编码，数据压缩比高。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>查询时只需扫描相关列，大幅减少磁盘 I/O。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>对 CPU 的分支预测和缓存预取非常友好。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>充分利用 CPU 的 SIMD (Single Instruction, Multiple Data) 指令，用一条指令同时处理多条数据，极大提升计算效率。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="14-cbo-优化器">&lt;a href="#14-cbo-%e4%bc%98%e5%8c%96%e5%99%a8" class="header-anchor">&lt;/a>1.4 CBO 优化器
+&lt;/h3>&lt;p>CBO 的核心任务是将用户输入的 SQL 语句转化为一个最高效的执行计划 (Plan)。&lt;/p>
+&lt;p>核心组件: Analyzer, Transformer, Rewriter, Optimizer。&lt;/p>
+&lt;p>主要优化方法:&lt;/p>
+&lt;p>逻辑重写: 如谓词下推、列裁剪、子查询改写等。&lt;/p>
+&lt;p>物理优化: 如 Join 顺序调整、自动选择最优的 Join 算法等。&lt;/p>
+&lt;h3 id="15-可实时更新的列式存储引擎">&lt;a href="#15-%e5%8f%af%e5%ae%9e%e6%97%b6%e6%9b%b4%e6%96%b0%e7%9a%84%e5%88%97%e5%bc%8f%e5%ad%98%e5%82%a8%e5%bc%95%e6%93%8e" class="header-anchor">&lt;/a>1.5 可实时更新的列式存储引擎
+&lt;/h3>&lt;p>StarRocks 的存储引擎在具备列存优势的同时，支持高效的数据实时更新。&lt;/p>
+&lt;p>更新模型:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>Primary Key (主键模型): 基于主键实现 &lt;code>Delete-and-insert&lt;/code>，保证大批量导入时的查询性能。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Update (更新模型): 基于 Key 列实现 &lt;code>Merge-on-read&lt;/code>，适用于更新频率更高的场景。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h2 id="2-统一特性">&lt;a href="#2-%e7%bb%9f%e4%b8%80%e7%89%b9%e6%80%a7" class="header-anchor">&lt;/a>2. 统一特性
+&lt;/h2>&lt;p>StarRocks 致力于通过一个平台解决多样化的分析需求，实现从场景、数据到管理的全面统一。&lt;/p>
+&lt;h3 id="21-场景与语法统一">&lt;a href="#21-%e5%9c%ba%e6%99%af%e4%b8%8e%e8%af%ad%e6%b3%95%e7%bb%9f%e4%b8%80" class="header-anchor">&lt;/a>2.1 场景与语法统一
+&lt;/h3>&lt;p>SQL 语法统一:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>内部查询: 完整支持 TPC-H 和 TPC-DS 等标准测试集，兼容 MySQL 协议。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>联邦查询: 能用一套 SQL 语法查询 MySQL、PostgreSQL、Elasticsearch 等外部数据库以及 Hive、Hudi、Iceberg 等数据湖。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>分析场景统一: 适用于各类 OLAP 场景，如实时报表、用户画像、Ad-hoc 查询、实时风控等。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="22-表模型支持">&lt;a href="#22-%e8%a1%a8%e6%a8%a1%e5%9e%8b%e6%94%af%e6%8c%81" class="header-anchor">&lt;/a>2.2 表模型支持
+&lt;/h3>&lt;p>StarRocks 提供多种表模型以适应不同的业务场景。&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th>表模型&lt;/th>
+&lt;th>特点&lt;/th>
+&lt;th>适用场景&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td>明细模型&lt;/td>
+&lt;td>保存原始明细数据，追加写入，几乎无更新。&lt;/td>
+&lt;td>日志、操作记录、时序数据等。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>聚合模型&lt;/td>
+&lt;td>数据导入时实时完成预聚合 (SUM, MIN, MAX 等)，无需查询明细。&lt;/td>
+&lt;td>预先按维度汇总的统计数据等。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>更新模型&lt;/td>
+&lt;td>支持基于 Key 列的更新 (&lt;code>Merge-on-read&lt;/code>)，更新频率高于主键模型。&lt;/td>
+&lt;td>状态会频繁变动的订单、设备状态等。&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>主键模型&lt;/td>
+&lt;td>支持基于主键的更新 (&lt;code>Delete-and-insert&lt;/code>)，保证批量导入和查询性能。&lt;/td>
+&lt;td>状态会发生变动的订单、设备状态等。&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="23-流批一体与管理统一">&lt;a href="#23-%e6%b5%81%e6%89%b9%e4%b8%80%e4%bd%93%e4%b8%8e%e7%ae%a1%e7%90%86%e7%bb%9f%e4%b8%80" class="header-anchor">&lt;/a>2.3 流批一体与管理统一
+&lt;/h3>&lt;ul>
+&lt;li>
+&lt;p>流批一体: StarRocks 可作为统一的数据分析平台，无缝对接 Kafka、Flink 等流处理系统和离线的批处理数据，为上层应用提供统一的数据出口。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>集群管理统一: 支持通过资源组 (Resource Groups) 对 CPU、内存、I/O 等资源进行隔离和管理，实现多租户在同一集群内的稳定运行。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="24-all-in-starrocks-解决方案">&lt;a href="#24-all-in-starrocks-%e8%a7%a3%e5%86%b3%e6%96%b9%e6%a1%88" class="header-anchor">&lt;/a>2.4 &amp;ldquo;All in StarRocks&amp;rdquo; 解决方案
+&lt;/h3>&lt;p>通过一个 StarRocks 平台，可以逐步替代过去由 ClickHouse、Druid、Kylin、Impala 等多种组件构成的复杂分析架构，从而大幅降低运维成本，提升数据时效性和系统稳定性。&lt;/p>
+&lt;h2 id="3-湖仓一体">&lt;a href="#3-%e6%b9%96%e4%bb%93%e4%b8%80%e4%bd%93" class="header-anchor">&lt;/a>3. 湖仓一体
+&lt;/h2>&lt;p>StarRocks 提出了新型的湖仓融合架构，将数据仓库的性能与数据湖的开放灵活相结合。&lt;/p>
+&lt;h3 id="31-lakehouse-概念">&lt;a href="#31-lakehouse-%e6%a6%82%e5%bf%b5" class="header-anchor">&lt;/a>3.1 Lakehouse 概念
+&lt;/h3>&lt;p>Lakehouse 是一种结合了数据仓库 (Data Warehouse) 和数据湖 (Data Lake) 优势的新型架构。 StarRocks 作为“极速统一开放的湖仓”，既能直接对数据湖进行高性能分析，也能在内部进行高效的数据加工和存储。&lt;/p>
+&lt;h3 id="32-全新的现代化物化视图">&lt;a href="#32-%e5%85%a8%e6%96%b0%e7%9a%84%e7%8e%b0%e4%bb%a3%e5%8c%96%e7%89%a9%e5%8c%96%e8%a7%86%e5%9b%be" class="header-anchor">&lt;/a>3.2 全新的现代化物化视图
+&lt;/h3>&lt;p>物化视图 (Materialized View) 是实现湖仓融合、加速查询的关键技术。&lt;/p>
+&lt;p>特点:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>支持分区粒度的自动或手动刷新。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>能够对 Join、Aggregate 等复杂查询进行透明的查询改写和加速。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>可以直接在 Hive、Iceberg 等外部数据湖表上构建，无需复杂的 ETL 流程即可加速数据湖查询。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;p>价值:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>简化数据分层建模。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>为固定报表和 Ad-hoc 分析提供统一的加速层。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="33-存算分离架构">&lt;a href="#33-%e5%ad%98%e7%ae%97%e5%88%86%e7%a6%bb%e6%9e%b6%e6%9e%84" class="header-anchor">&lt;/a>3.3 存算分离架构
+&lt;/h3>&lt;p>StarRocks 支持存算分离部署模式，进一步提升了架构的弹性和成本效益。&lt;/p>
+&lt;p>架构演进: 从存算一体的经典集群 (FE + BE) 演进为存算分离的弹性集群 (FE + CN + 共享存储)。&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>FE (Frontend): 负责元数据管理和查询优化。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>CN (Compute Node): 无状态的计算节点，负责执行计算任务。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>共享存储: 数据持久化存储在 S3、HDFS 等低成本共享存储上。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;p>核心优势:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>弹性: 计算节点 (CN) 可根据负载情况自由伸缩，无需数据迁移。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>低成本: 存储从多副本变为单副本，可使用更经济的对象存储。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>隔离: 可为不同业务部署独立的计算集群，实现工作负载隔离。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>高可用: 借助云存储的高可靠性，实现跨可用区部署和灾备。&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="34-四种湖仓融合解决方案">&lt;a href="#34-%e5%9b%9b%e7%a7%8d%e6%b9%96%e4%bb%93%e8%9e%8d%e5%90%88%e8%a7%a3%e5%86%b3%e6%96%b9%e6%a1%88" class="header-anchor">&lt;/a>3.4 四种湖仓融合解决方案
+&lt;/h3>&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th>使用方式&lt;/th>
+&lt;th>数据湖存储格式&lt;/th>
+&lt;th>数仓存储格式&lt;/th>
+&lt;th>读写流程&lt;/th>
+&lt;th>适用场景&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td>加速数据湖查询&lt;/td>
+&lt;td>Hive/Iceberg&lt;/td>
+&lt;td>Local cache&lt;/td>
+&lt;td>数据直接入湖，StarRocks 加速查询&lt;/td>
+&lt;td>数据湖 Adhoc 加速&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>湖仓分层建模&lt;/td>
+&lt;td>Hive/Iceberg&lt;/td>
+&lt;td>MV (StarRocks format)&lt;/td>
+&lt;td>数据直接入湖，StarRocks ELT 加工&lt;/td>
+&lt;td>高并发低延迟报表&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>实时数仓与数据湖融合&lt;/td>
+&lt;td>Hive/Iceberg&lt;/td>
+&lt;td>StarRocks format&lt;/td>
+&lt;td>数据写入 StarRocks，异步刷新到湖&lt;/td>
+&lt;td>秒级实时场景且有数据湖基础&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>StarRocks 云原生湖仓&lt;/td>
+&lt;td>StarRocks format&lt;/td>
+&lt;td>StarRocks format&lt;/td>
+&lt;td>数据写入 StarRocks，持久化到对象存储&lt;/td>
+&lt;td>一站式 Lakehouse 方案&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h2 id="4-总结">&lt;a href="#4-%e6%80%bb%e7%bb%93" class="header-anchor">&lt;/a>4. 总结
+&lt;/h2>&lt;p>极速统一: StarRocks 在 SSB、TPC-H、TPC-DS 等标准化测试集上，平均性能超过竞品 2-3 倍。 在真实业务场景中，能有效支撑固定报表、自助 BI、用户画像和高并发查询等。&lt;/p>
+&lt;p>湖仓融合: StarRocks 提供了两种主要的湖仓一体化路径：一是作为统一 Lakehouse，数据直接写入 StarRocks 进行极速分析；二是直接查询和分析开放数据湖中的数据，并利用物化视图加速。&lt;/p></description></item><item><title>StarRocks 学习笔记 Day1</title><link>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day1/</link><pubDate>Wed, 28 May 2025 00:00:00 +0000</pubDate><guid>https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day1/</guid><description>&lt;img src="https://Cyrus-iwnl.github.io/p/starrocks-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-day1/sr.png" alt="Featured image of post StarRocks 学习笔记 Day1" />&lt;h2 id="数据架构演进">&lt;a href="#%e6%95%b0%e6%8d%ae%e6%9e%b6%e6%9e%84%e6%bc%94%e8%bf%9b" class="header-anchor">&lt;/a>数据架构演进
+&lt;/h2>&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th>代际&lt;/th>
+&lt;th>特点&lt;/th>
+&lt;th>典型技术&lt;/th>
+&lt;th>数据类型&lt;/th>
+&lt;th>资源架构&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td>第1代&lt;/td>
+&lt;td>关系型数据库&lt;/td>
+&lt;td>Oracle/MySQL&lt;/td>
+&lt;td>结构化&lt;/td>
+&lt;td>专业设备共享存储&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>第2代&lt;/td>
+&lt;td>MPP数仓&lt;/td>
+&lt;td>Greenplum/Vertica&lt;/td>
+&lt;td>结构化&lt;/td>
+&lt;td>X86通用服务器MPP&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>第3代&lt;/td>
+&lt;td>Hadoop平台&lt;/td>
+&lt;td>Hive/Hudi/Iceberg&lt;/td>
+&lt;td>结构化/半结构化&lt;/td>
+&lt;td>通用服务器&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>第4代&lt;/td>
+&lt;td>智能湖仓一体&lt;/td>
+&lt;td>StarRocks&lt;/td>
+&lt;td>结构化/半结构化/非结构化&lt;/td>
+&lt;td>存算分离云原生&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h2 id="starrocks-核心优势">&lt;a href="#starrocks-%e6%a0%b8%e5%bf%83%e4%bc%98%e5%8a%bf" class="header-anchor">&lt;/a>StarRocks 核心优势
+&lt;/h2>&lt;ol>
+&lt;li>
+&lt;p>&lt;strong>极致性能&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>向量化执行引擎&lt;/li>
+&lt;li>CBO优化器+Runtime Filter&lt;/li>
+&lt;li>单节点100亿行/秒处理速度&lt;/li>
+&lt;li>查询延迟亚秒级&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>实时能力&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>秒级数据更新可见&lt;/li>
+&lt;li>单节点100MB/s写入速度&lt;/li>
+&lt;li>支持主键更新模型&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>灵活架构&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>多模型支持：星型/雪花/宽表模型&lt;/li>
+&lt;li>存算分离架构（云原生）&lt;/li>
+&lt;li>多表物化视图加速查询&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>生态整合&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>外部数据目录：Hive/ES/MySQL/Hudi/Iceberg/Delta Lake&lt;/li>
+&lt;li>计算集群隔离：多租户资源组&lt;/li>
+&lt;li>无缝对接BI工具（Tableau/FineBI等）&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h2 id="核心场景">&lt;a href="#%e6%a0%b8%e5%bf%83%e5%9c%ba%e6%99%af" class="header-anchor">&lt;/a>核心场景
+&lt;/h2>&lt;ol>
+&lt;li>
+&lt;p>&lt;strong>实时分析&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>实时数据看板&lt;/li>
+&lt;li>A/B测试分析&lt;/li>
+&lt;li>金融风控即时决策&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>混合负载&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>高并发点查（TP99&amp;lt;1s）&lt;/li>
+&lt;li>Ad-hoc查询&lt;/li>
+&lt;li>批量报表生成&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>湖仓一体&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>直接查询数据湖（Iceberg/Hudi/Delta Lake）&lt;/li>
+&lt;li>无需ETL预处理&lt;/li>
+&lt;li>统一数据源（Single Source of Truth）&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h2 id="数据仓库-vs-数据湖">&lt;a href="#%e6%95%b0%e6%8d%ae%e4%bb%93%e5%ba%93-vs-%e6%95%b0%e6%8d%ae%e6%b9%96" class="header-anchor">&lt;/a>数据仓库 vs 数据湖
+&lt;/h2>&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th>维度&lt;/th>
+&lt;th>数据仓库&lt;/th>
+&lt;th>数据湖&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td>数据格式&lt;/td>
+&lt;td>特有格式（优化性能）&lt;/td>
+&lt;td>通用格式（Parquet/ORC）&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>存储成本&lt;/td>
+&lt;td>高（本地SSD）&lt;/td>
+&lt;td>低（S3/对象存储）&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>典型引擎&lt;/td>
+&lt;td>StarRocks/ClickHouse&lt;/td>
+&lt;td>Trino/Presto&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>优势场景&lt;/td>
+&lt;td>实时BI分析&lt;/td>
+&lt;td>机器学习/AI训练&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h2 id="部署能力">&lt;a href="#%e9%83%a8%e7%bd%b2%e8%83%bd%e5%8a%9b" class="header-anchor">&lt;/a>部署能力
+&lt;/h2>&lt;ul>
+&lt;li>&lt;strong>云原生支持&lt;/strong>
+&lt;ul>
+&lt;li>AWS/GCP/Azure全平台兼容&lt;/li>
+&lt;li>Kubernetes/Helm自动化部署&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;strong>扩展生态&lt;/strong>
+&lt;ul>
+&lt;li>数据集成：Flink/Kafka/Spark Connector&lt;/li>
+&lt;li>权限管理：Kerberos/Apache Ranger&lt;/li>
+&lt;li>监控体系：Prometheus/Grafana/Datadog&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h2 id="性能指标">&lt;a href="#%e6%80%a7%e8%83%bd%e6%8c%87%e6%a0%87" class="header-anchor">&lt;/a>性能指标
+&lt;/h2>&lt;ul>
+&lt;li>综合查询速度比同类产品快3-5倍&lt;/li>
+&lt;li>支持数千用户并发访问&lt;/li>
+&lt;li>高并发场景QPS&amp;gt;10,000+&lt;/li>
+&lt;li>存储成本降低80%（对比传统MPP）&lt;/li>
+&lt;/ul></description></item></channel></rss>
